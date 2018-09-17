@@ -11,7 +11,6 @@ target 'nCRYPT' do
     pod 'Firebase/Storage'
     pod 'Firebase/Auth'
     pod 'JSQMessagesViewController'
-    pod 'CryptoSwift', :git => "https://github.com/krzyzanowskim/CryptoSwift", :branch => "master"
     pod 'SwiftyRSA'
     pod 'SwiftKeychainWrapper'
     

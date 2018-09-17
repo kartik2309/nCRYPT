@@ -8,7 +8,6 @@
 
 import Foundation
 import Security
-import CryptoSwift
 import SwiftyRSA
 import SwiftKeychainWrapper
 
@@ -28,7 +27,7 @@ class SecurityFramework{
     }
     
     func keyderivation(string: String) -> String{
-        return string.sha256().md5()
+        return string
     }
     
     

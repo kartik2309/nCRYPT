@@ -212,7 +212,7 @@ class DatabaseProvider{
 
             if snapshot.exists() {
                 
-                let messageDict: Dictionary<String, Any> = [key: message]
+                let messageDict: Dictionary<String, Any> = [key!: message]
                 
                 self.databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).child(DataBaseReferencePaths.MESSAGE).updateChildValues(messageDict)
  
