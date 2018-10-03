@@ -74,6 +74,7 @@ class SignInVC: UIViewController, UITextFieldDelegate {
                     DatabaseProvider.Instance.userDataFromDataBase()
                     UserDefaultHandler.Instance.setCurrentUserId(userId: AuthenticationProvider.Instance.userId())
                     
+                    
                     self.timer = Timer.scheduledTimer(timeInterval: 5, target: self, selector: #selector(self.callSegueToChatVc), userInfo: nil, repeats: false)
                     
                 }

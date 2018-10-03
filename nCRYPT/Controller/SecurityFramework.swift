@@ -25,13 +25,10 @@ class SecurityFramework{
         case CryptorError((String,Int))
         
     }
-    
-    func keyderivation(string: String) -> String{
-        return string
-    }
-    
+
     
     func stringToData(input: String) -> Data?{
+        
         guard let data = input.data(using: .utf8, allowLossyConversion: false)
             else{
                 print("could not convert string to data")
@@ -40,12 +37,26 @@ class SecurityFramework{
         return data
     }
     
-    func datatoString(input: Data) -> String?{
-        guard let string = String(data: input, encoding: .utf8)
-            else {
-                print("Could not convert the data to string")
-                return nil
-        }
+    func base64StringToData(input: String)-> Data?{
+        let data = Data(base64Encoded: input)
+        return data
+    }
+    
+    func dataToString(input: Data) -> String?{
+        
+        let b64String = dataToBase64String(input: input)
+        let string = base64StringToString(input: b64String!)
+        
+        return string
+    }
+    
+    func dataToBase64String(input: Data) -> String?{
+        return input.base64EncodedString()
+    }
+    
+    func base64StringToString(input: String)-> String?{
+        let data = Data(base64Encoded: input)
+        let string = String(decoding: data!, as: UTF8.self)
         return string
     }
     
@@ -66,32 +77,32 @@ class SecurityFramework{
         
         let publicKey = try PublicKey(pemEncoded: publicKeyPEM)
         let clear = try ClearMessage(string: message, using: .utf8)
-        let encrypted = try clear.encrypted(with: publicKey, padding: .PKCS1SHA512)
+        let encrypted = try clear.encrypted(with: publicKey, padding: .OAEP)
         
         let base64String = encrypted.base64String
         return base64String
         
     }
     
-    func rsaDecryption(message: String) throws -> String{
+    func rsaDecryption(message: String, userId: String) throws -> String{
         
-        let privateKey = try PrivateKey(pemEncoded: rsaPrivateKey())
+        let privateKey = try PrivateKey(pemEncoded: rsaPrivateKey(userId: userId))
         let encrypted = try EncryptedMessage(base64Encoded: message)
-        let clear = try encrypted.decrypted(with: privateKey, padding: .PKCS1SHA512)
+        let clear = try encrypted.decrypted(with: privateKey, padding: .OAEP)
         
-        let base64String = clear.base64String
-        return base64String
+        let string = try clear.string(encoding: .utf8)
+        return string
     }
     
-    func rsaPrivateKey()->String{
-        return KeychainWrapper.standard.string(forKey: "private")!
+    func rsaPrivateKey(userId: String)->String{
+        return KeychainWrapper.standard.string(forKey: "private" + userId)!
     }
     
-    func rsaPublicKey()->String{
-        return KeychainWrapper.standard.string(forKey: "public")!
+    func rsaPublicKey(userId: String)->String{
+        return KeychainWrapper.standard.string(forKey: "public" + userId)!
     }
     
-    func rsaKeyGeneration() throws -> Bool{
+    func rsaKeyGeneration(userId: String) throws -> Bool{
         
         var success = false
         let keyPair = try SwiftyRSA.generateRSAKeyPair(sizeInBits: 2048)
@@ -101,8 +112,9 @@ class SecurityFramework{
         let privateKeyPEM = try privateKey.pemString()
         let publicKeyPEM = try publicKey.pemString()
 
-        let prks = KeychainWrapper.standard.set(privateKeyPEM, forKey: "private")
-        let puks = KeychainWrapper.standard.set(publicKeyPEM, forKey: "public")
+        
+        let prks = KeychainWrapper.standard.set(privateKeyPEM, forKey: "private" + userId)
+        let puks = KeychainWrapper.standard.set(publicKeyPEM, forKey: "public" + userId)
         
         if (puks && prks){
             success = true
@@ -166,7 +178,7 @@ class SecurityFramework{
             throw AESerror.CryptorError(("Encryption failed", Int(cryptStatus)))
         }
         
-        return cryptData;
+        return cryptData
     }
     
     func aes256Decryption(data:Data, keyData:Data) throws -> Data? {
@@ -218,12 +230,39 @@ class SecurityFramework{
     }
     
     //MARK: Key Sharing
-
-    
+/*
     func KeySharingReceive(aesKey: String) throws -> String{
-        let decryptedKey = try rsaDecryption(message: aesKey)
+        let decryptedKey = try rsaDecryption(message: aesKey, userId: <#String#>)
         return decryptedKey
     }
+ 
+ 
     
-}
+    func saveAesSessionKey(key : String, senderUserId: String) {
+        saveIntoKeyChain(data: key, key: senderUserId + "aesKey")
+    }
+    
+    func isKeySaved(senderUserId: String) -> Bool{
+        var aesKeyPresent = false
+        
+        if (KeychainWrapper.standard.string(forKey: senderUserId + "aesKey") != nil)
+        {
+            aesKeyPresent = true
+        }
+        
+        return aesKeyPresent
+    }
+    
+    func getAesKey(senderUserId: String) -> String {
+        return readFromKeyChain(key: senderUserId + "aesKey")
+    }
+    
+    func removeSessionKey(senderUserId: String) {
+        if isKeySaved(senderUserId: senderUserId){
+            KeychainWrapper.standard.removeObject(forKey: senderUserId + "aesKey")
+        }
+        
+    }
+     */
 
+}

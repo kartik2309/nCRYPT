@@ -24,6 +24,7 @@ class FileManagerHandler{
     
     weak var messageHistoryDelegate: FetchMessageHistoryFromLocal?
     
+    
     func saveImage(image: UIImage, imageName: String) -> Bool {
         guard let data = UIImageJPEGRepresentation(image, 1) ?? UIImagePNGRepresentation(image) else {
             return false

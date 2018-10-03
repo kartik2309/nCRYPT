@@ -13,7 +13,8 @@ protocol FetchLastMessageText: class {
     func lastMessageText(lastMessageText: String)
 }
 
-class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, FetchMessageInRealTime{
+class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, FetchMessageInRealTime, FetchPublicKey {
+    
     
     //MARK: Outlets
     
@@ -32,7 +33,7 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
     var email = String()
     var imageUrl = String()
     
-    var messagesInString = [String]()
+    var messagesInString = [UserMessageHandler]()
     private var messages = [JSQMessage]()
     private var userName = String()
     private var messageHistoryInChat = String()
@@ -44,7 +45,8 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
     
     //(Security Parameters)
     private var sessionKey = String()
-    
+    private var sessionKeyData = Data()
+    private var senderUserPublicKey = String()
 
     //Mark: Segues
     let INFO_SEGUE = "InfoSegue"
@@ -60,19 +62,9 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
         
         super.viewDidLoad()
         
-        //Setting up Security Parameters.
-        
-        do{
-            sessionKey = SecurityFramework.security.aesKeyGeneration()
-            let publicKey = DatabaseProvider.Instance.getPublickey(senderUserId: senderUserId)
-            let encryptedKey = try SecurityFramework.security.rsaEncryption(message: sessionKey, publicKeyPEM: publicKey)
-            
-            
-        }catch{
-            print("Error occured in messageVc",error)
-        }
-        
-        
+        //Calling for receiver's public key
+        DatabaseProvider.Instance.rsaPublicKeyDelegate = self
+        DatabaseProvider.Instance.getPublickey(senderUserId: senderUserId)
         
         //Setting up the chat background color
         collectionView.backgroundColor = UIColor.clear
@@ -95,10 +87,9 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
         FileManagerHandler.Instance.loadChatLog(senderId: senderId, senderUserId: senderUserId)
         
         
-        
-        
         //Load previous messages as well as newly received messages
         loadMessages()
+        print("message array count:",messagesInString.count)
         
         //Update the view with realtime messages.
         DatabaseProvider.Instance.messageInRealTimeDelegate = self
@@ -108,9 +99,6 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
         if !flag{
             timer.invalidate()
         }
-        
-        
-        
     }
 
     override func didReceiveMemoryWarning() {
@@ -168,35 +156,35 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
 
     override func didPressSend(_ button: UIButton!, withMessageText text: String!, senderId: String!, senderDisplayName: String!, date: Date!) {
         
-        messages.append(JSQMessage(senderId: senderId, displayName: senderDisplayName, text: text))
+        sessionKey = SecurityFramework.security.aesKeyGeneration()
+        sessionKeyData = SecurityFramework.security.stringToData(input: sessionKey)!
         
         let messageData = SecurityFramework.security.stringToData(input: text)
         
-        let keyData = SecurityFramework.security.stringToData(input: SecurityFramework.security.aesKeyGeneration())
-        
+        print("Session key",sessionKey)
         
         do {
-            let encryptedData = try SecurityFramework.security.aes256Encryption(data: messageData!, keyData: keyData!)
-            let encryptedString = encryptedData.base64EncodedString()
             
+            let encryptedKey = try SecurityFramework.security.rsaEncryption(message: sessionKey, publicKeyPEM: senderUserPublicKey)
             
-            let decryptedData = try SecurityFramework.security.aes256Decryption(data: encryptedData, keyData: keyData!)
-            let decryptedString = SecurityFramework.security.datatoString(input: decryptedData!)
+            let encryptedData = try SecurityFramework.security.aes256Encryption(data: messageData!, keyData: sessionKeyData)
             
-            print("Encrypted Text:", encryptedString)
-            print("Decrypted Text:", decryptedString!)
+            print("Encrypted data:",encryptedData)
             
+            let encryptedString = SecurityFramework.security.dataToBase64String(input: encryptedData)
+            
+            messages.append(JSQMessage(senderId: senderId, displayName: senderDisplayName, text: text))
+            
+            let messageDictionary: Dictionary<String,String> = ["Message": encryptedString!, "AES Key": encryptedKey]
+            
+            DatabaseProvider.Instance.sendMessageToDatabase(senderUserId: senderUserId,senderName: senderDisplayName, senderEmail: email, senderImageUrl: imageUrl, senderId: senderId, message: messageDictionary)
+            
+            DatabaseProvider.Instance.saveNewChat(senderUserId: senderUserId, senderUserName: senderUserName, senderUserEmail: senderEmail, senderUserImageUrl: senderImageUrl, senderId: senderId)
+            
+            FileManagerHandler.Instance.saveChatLog(senderId: senderId, senderUserId: senderUserId, message: text, senderAtTheMoment: senderId)
         } catch {
-            print("Error Occured in message VC", error)
+            print("Error Occured in message Vc encryption", error)
         }
-        
-        
-       /* DatabaseProvider.Instance.sendMessageToDatabase(senderUserId: senderUserId,senderName: senderDisplayName, senderEmail: email, senderImageUrl: imageUrl, senderId: senderId, message: encryptedText)
-        
-        DatabaseProvider.Instance.saveNewChat(senderUserId: senderUserId, senderUserName: senderUserName, senderUserEmail: senderEmail, senderUserImageUrl: senderImageUrl, senderId: senderId)
-        
-        FileManagerHandler.Instance.saveChatLog(senderId: senderId, senderUserId: senderUserId, message: text, senderAtTheMoment: senderId)
-        */
         
         collectionView.reloadData()
         
@@ -206,7 +194,6 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
     override func willMove(toParentViewController parent: UIViewController?) {
         if parent == nil{
             flag = false
-            
         }
     }
     
@@ -231,21 +218,40 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
         
         for i in (0 ..< messagesInString.count){
             
-            let decryptedString = ""
-            //let decryptedString = SecurityFramework.security.aes256Decryption(messageText: messagesInString[i], keyData: keyForDecrpytion, iv: ivForDecrpytion)
-            
-            messages.append(JSQMessage(senderId: senderUserId, displayName: senderUserName, text: decryptedString))
-            
-            
-            FileManagerHandler.Instance.saveChatLog(senderId: senderId, senderUserId: senderUserId, message: decryptedString, senderAtTheMoment: senderUserId)
-            
-        }
+            if !messagesInString[i].messages.isEmpty{
+                
+                let encryptedMessageData = SecurityFramework.security.base64StringToData(input: messagesInString[i].messages[i])
+                
+                do{
+                    
+                    sessionKey = try SecurityFramework.security.rsaDecryption(message: messagesInString[i].keys[i], userId: senderId)
+                    
+                    sessionKeyData = SecurityFramework.security.stringToData(input: sessionKey)!
+                    
+                    let decryptedData = try SecurityFramework.security.aes256Decryption(data: encryptedMessageData!, keyData: sessionKeyData)
+                    
+                    let decryptedString = SecurityFramework.security.dataToString(input: decryptedData!)
+                    
+                    messages.append(JSQMessage(senderId: senderUserId, displayName: senderUserName, text: decryptedString))
+                    
+                    FileManagerHandler.Instance.saveChatLog(senderId: senderId, senderUserId: senderUserId, message: decryptedString!, senderAtTheMoment: senderUserId)
+                    
+                }
+                catch{
+                    print("Error occured in the decryption process")
+                }
 
-        messageHistoryInChat.removeAll()
+            }
+        }
+        
         messagesInString.removeAll()
+        messageHistoryInChat.removeAll()
+
         collectionView.reloadData()
     }
     
+    
+    //MARK: Delegate Functions
     
     func recieveMessageContent(messageHistory: String){
         messageHistoryInChat = messageHistory
@@ -295,35 +301,63 @@ class MessagesVC: JSQMessagesViewController, FetchMessageHistoryFromLocal, Fetch
         }
     }
     
-    func recieveMessagesInRealTime(messages : [String]){
+    func recieveMessagesInRealTime(messages : [UserMessageHandler]){
         messagesInString = messages
     }
+    
+    func getRSAPublicKey(publicKey: RSAPublicKey) {
+        senderUserPublicKey = publicKey.publicKey
+    }
+    
+    
     
     func updateInRealTime(){
         
         
-        if !messagesInString.isEmpty{
+        for i in (0 ..< messagesInString.count){
             
-            for i in (0 ..< messagesInString.count){
-                let decryptedString = ""
-                //let decryptedString = SecurityFramework.security.aes256Decryption(messageText: messagesInString[i], keyData: keyForDecrpytion, iv: ivForDecrpytion)
+            if !messagesInString[i].messages.isEmpty{
                 
-                messages.append(JSQMessage(senderId: senderUserId, displayName: senderDisplayName, text: decryptedString))
+                let encryptedMessageData = SecurityFramework.security.base64StringToData(input: messagesInString[i].messages[i])
                 
-                FileManagerHandler.Instance.saveChatLog(senderId: senderId, senderUserId: senderUserId, message: decryptedString, senderAtTheMoment: senderUserId)
+                do{
+                    
+                    let decryptedKeyString = try SecurityFramework.security.rsaDecryption(message: messagesInString[i].keys[i], userId: senderId)
+                    
+                    let decryptedKeyData = SecurityFramework.security.stringToData(input: decryptedKeyString)
+                    
+                    let decryptedData = try SecurityFramework.security.aes256Decryption(data: encryptedMessageData!, keyData: decryptedKeyData!)
+                    
+                    let decryptedString = SecurityFramework.security.dataToString(input: decryptedData!)
+                    
+                    messages.append(JSQMessage(senderId: senderUserId, displayName: senderUserName, text: decryptedString))
+                    
+                    print("Decrypted test from update messages:", decryptedString!)
+                    
+                    FileManagerHandler.Instance.saveChatLog(senderId: senderId, senderUserId: senderUserId, message: decryptedString!, senderAtTheMoment: senderUserId)
+                }
+                catch{
+                    print("Error occured in the decryption process")
+                }
             }
-            messagesInString.removeAll()
         }
+        messagesInString.removeAll()
+        messageHistoryInChat.removeAll()
         collectionView.reloadData()
-        
     }
     
-    //MARK: Update the chat in real time
+    //MARK: Selector target functions
+    
+    //Update the chat in real time
     @objc func update(){
         DatabaseProvider.Instance.deliverMessagesDirectlyToMessageView(senderId: senderId, senderUserId: senderUserId, flag: flag)
         updateInRealTime()
 
     }
+    
+
+
+    
     
     //MARK: Perpare Segues
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {

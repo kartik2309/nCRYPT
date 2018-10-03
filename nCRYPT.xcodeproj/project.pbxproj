@@ -10,6 +10,7 @@
 		298DBE9F8216F71A3CD77218 /* Pods_nCRYPTTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3F4A238319F0B16402DF3155 /* Pods_nCRYPTTests.framework */; };
 		53076402212C320D004882EB /* FInalSignUpVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53076401212C320D004882EB /* FInalSignUpVC.swift */; };
 		53076404212C33FC004882EB /* SignUp1VC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53076403212C33FC004882EB /* SignUp1VC.swift */; };
+		530DDB7F2161108400ADDB71 /* RSAPublicKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530DDB7E2161108400ADDB71 /* RSAPublicKey.swift */; };
 		53286C3120C9006F008AFD95 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53286C3020C9006F008AFD95 /* AppDelegate.swift */; };
 		53286C3620C9006F008AFD95 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 53286C3420C9006F008AFD95 /* Main.storyboard */; };
 		53286C4620C90071008AFD95 /* nCRYPTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53286C4520C90071008AFD95 /* nCRYPTTests.swift */; };
@@ -64,6 +65,7 @@
 		3F4A238319F0B16402DF3155 /* Pods_nCRYPTTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_nCRYPTTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		53076401212C320D004882EB /* FInalSignUpVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FInalSignUpVC.swift; sourceTree = "<group>"; };
 		53076403212C33FC004882EB /* SignUp1VC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUp1VC.swift; sourceTree = "<group>"; };
+		530DDB7E2161108400ADDB71 /* RSAPublicKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSAPublicKey.swift; sourceTree = "<group>"; };
 		53286C2D20C9006F008AFD95 /* nCRYPT.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = nCRYPT.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		53286C3020C9006F008AFD95 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		53286C3520C9006F008AFD95 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -220,13 +222,13 @@
 			children = (
 				53915FF520CBDA9900BCF44F /* InitialScreen.swift */,
 				5343B47220C90887005914E8 /* SignInVC.swift */,
+				53076403212C33FC004882EB /* SignUp1VC.swift */,
+				53076401212C320D004882EB /* FInalSignUpVC.swift */,
 				53915FEB20CBBA7A00BCF44F /* ChatVC.swift */,
 				5370FC9A20DD0232000DEDA4 /* AddChatVC.swift */,
 				53D49E5920CC2F850059CD29 /* MessagesVC.swift */,
 				53ADA3C620D3828000D6C538 /* UserInfoVC.swift */,
 				53D584C320E36E1D0057C24D /* InfoVC.swift */,
-				53076403212C33FC004882EB /* SignUp1VC.swift */,
-				53076401212C320D004882EB /* FInalSignUpVC.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -247,6 +249,7 @@
 				53915FEF20CBBD1100BCF44F /* MessageSenderHandler.swift */,
 				53C58E1920CD217F00E2BE10 /* UserMessageHandler.swift */,
 				5370FCA020DD76F6000DEDA4 /* SearchHandlerToAddChat.swift */,
+				530DDB7E2161108400ADDB71 /* RSAPublicKey.swift */,
 			);
 			path = "DataBase Interaction Handlers";
 			sourceTree = "<group>";
@@ -525,6 +528,7 @@
 				53C58E1A20CD217F00E2BE10 /* UserMessageHandler.swift in Sources */,
 				53915FF020CBBD1100BCF44F /* MessageSenderHandler.swift in Sources */,
 				539D279720C9BB3E00EE1D8D /* AuthenticationProvider.swift in Sources */,
+				530DDB7F2161108400ADDB71 /* RSAPublicKey.swift in Sources */,
 				53B77E7520CA6BFE008B4B4B /* DatabaseProvider.swift in Sources */,
 				53915FF620CBDA9900BCF44F /* InitialScreen.swift in Sources */,
 				53076402212C320D004882EB /* FInalSignUpVC.swift in Sources */,

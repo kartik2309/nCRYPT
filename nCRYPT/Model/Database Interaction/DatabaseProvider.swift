@@ -33,11 +33,19 @@ protocol  FetchMessageText: class {
 }
 
 protocol FetchMessageInRealTime: class {
-    func recieveMessagesInRealTime(messages: [String])
+    func recieveMessagesInRealTime(messages: [UserMessageHandler])
 }
 
 protocol FetchUser: class{
     func getUserDetails(searchResultDetails: [SearchHandlerToAddChat])
+}
+
+protocol FetchPublicKey: class{
+    func getRSAPublicKey(publicKey: RSAPublicKey)
+}
+
+protocol  FetchAesKey: class {
+    func getAesKey(aesKey: String)
 }
 
 class DatabaseProvider{
@@ -52,6 +60,8 @@ class DatabaseProvider{
     weak var messageTextDelegate: FetchMessageText?
     weak var messageInRealTimeDelegate: FetchMessageInRealTime?
     weak var searchResultsDelegate: FetchUser?
+    weak var rsaPublicKeyDelegate: FetchPublicKey?
+    weak var aesKeyDelegate: FetchAesKey?
     
     var databaseReference: DatabaseReference{
         return Database.database().reference()
@@ -102,19 +112,22 @@ class DatabaseProvider{
         print("Saving to db")
         databaseReference.child(userId).child(DataBaseReferencePaths.USER_DATA).setValue(data)
         
+        saveNewRsaKey(userId: userId)
         
+    }
+    
+    func saveNewRsaKey(userId: String){
         do{
-            if(try SecurityFramework.security.rsaKeyGeneration()){
-                let rsaKeyDictionary: Dictionary<String,String> = [DataBaseReferencePaths.RSA: SecurityFramework.security.rsaPublicKey()]
+            if(try SecurityFramework.security.rsaKeyGeneration(userId: userId)){
+                let rsaKeyDictionary: Dictionary<String,String> = [DataBaseReferencePaths.RSA: SecurityFramework.security.rsaPublicKey(userId: userId)]
                 databaseReference.child(userId).child(DataBaseReferencePaths.RSA).setValue(rsaKeyDictionary)
-
+                
             }
             
         }
         catch{
             print("Error Occured in key generation:",error)
         }
-        
     }
     
     
@@ -169,6 +182,8 @@ class DatabaseProvider{
             
             var messageTextArray = [UserMessageHandler]()
             var messages = [String]()
+            var keys = [String]()
+            
             
             if snapshot.exists(){
                 
@@ -184,16 +199,29 @@ class DatabaseProvider{
                         
                         for child3 in childMessage.children{
                             
-                            let childMessageText = child3 as! DataSnapshot
+                            let childDict = child3 as! DataSnapshot
                             
-                            messages.append(childMessageText.value as! String)
+                            for child4 in childDict.children{
+                                
+                                let childMessageDictionary = child4 as! DataSnapshot
+                                
+                                if(childMessageDictionary.key == "Message"){
+                                    messages.append(childMessageDictionary.value as! String)
+                                }
+                                else if(childMessageDictionary.key == "AES Key"){
+                                    keys.append(childMessageDictionary.value as! String)
+                                }
+                                
+                            }
                             
+                            //print(childMessageText.value as! String)
                         }
                     }
-                    let newMessage = UserMessageHandler(messages: messages)
+                    let newMessage = UserMessageHandler(messages: messages, keys: keys)
                     messageTextArray.append(newMessage)
-                    self.messageTextDelegate?.messagesText(message: messageTextArray)
+                    
                 }
+                self.messageTextDelegate?.messagesText(message: messageTextArray)
             }
             else{
                 messageTextArray.removeAll()
@@ -202,7 +230,7 @@ class DatabaseProvider{
         })
     }
 
-    func sendMessageToDatabase(senderUserId: String,senderName: String, senderEmail:String, senderImageUrl: String, senderId: String, message: String){
+    func sendMessageToDatabase(senderUserId: String,senderName: String, senderEmail:String, senderImageUrl: String, senderId: String, message: Dictionary<String, String>){
         
         let key = self.databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).child(DataBaseReferencePaths.MESSAGE).childByAutoId().key
         databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).observeSingleEvent(of: DataEventType.value, with: {
@@ -223,7 +251,7 @@ class DatabaseProvider{
                 
                 self.databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).setValue(data)
                 
-                let messageDict: Dictionary<String, Any> = [key: message]
+                let messageDict: Dictionary<String, Any> = [key! : message]
                 
                 self.databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).child(DataBaseReferencePaths.MESSAGE).updateChildValues(messageDict)
                 
@@ -244,20 +272,32 @@ class DatabaseProvider{
             databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderUserId).child(DataBaseReferencePaths.MESSAGE).observeSingleEvent(of: .value) {
                 (snapshot: DataSnapshot) in
                 
+                
+                var messageHandler = [UserMessageHandler]()
                 var realTimeMessagesInChat = [String]()
+                var realTimeKeysInChat = [String]()
                 
                 if snapshot.exists(){
                     
                     for child in snapshot.children{
                         
-                        let messageText = child as! DataSnapshot
+                        let messageDict = child as! DataSnapshot
                         
-                        realTimeMessagesInChat.append(messageText.value as! String)
-                        
-                        
+                        for child2 in messageDict.children{
+                            let messageDictionary = child2 as! DataSnapshot
+                            
+                            if (messageDictionary.key == "Message"){
+                                realTimeMessagesInChat.append(messageDictionary.value as! String)
+                            }
+                            else if(messageDictionary.key == "AES Key"){
+                                realTimeKeysInChat.append(messageDictionary.value as! String)
+                            }
+                        }
+                        let newMessage = UserMessageHandler(messages: realTimeMessagesInChat, keys: realTimeKeysInChat)
+                        messageHandler.append(newMessage)
                     }
                     
-                    self.messageInRealTimeDelegate?.recieveMessagesInRealTime(messages: realTimeMessagesInChat)
+                    self.messageInRealTimeDelegate?.recieveMessagesInRealTime(messages: messageHandler)
                     DatabaseProvider.Instance.removeMessages(senderId: senderId, senderUserId: senderUserId)
                     
                 }
@@ -329,33 +369,70 @@ class DatabaseProvider{
         
     }
     
-    func getPublickey(senderUserId: String)->String{
-        let publicKey = databaseReference.child(senderUserId).child(DataBaseReferencePaths.RSA).value(forKey: DataBaseReferencePaths.RSA)
-        return publicKey as! String
+    func getPublickey(senderUserId: String){
+      databaseReference.child(senderUserId).child(DataBaseReferencePaths.RSA).observe(.value, with: {
+            (snapshot: DataSnapshot) in
+        
+        if(snapshot.exists()){
+            var rsaPublicKey = [RSAPublicKey]()
+            print(snapshot)
+            
+            for child in snapshot.children {
+                let publicKeySnapshot = child as! DataSnapshot
+                
+                print("Public Key is:", publicKeySnapshot.value as! String)
+                let publicKey = publicKeySnapshot.value as! String
+                rsaPublicKey.append(RSAPublicKey(publicKey: publicKey))
+            }
+            self.rsaPublicKeyDelegate?.getRSAPublicKey(publicKey: rsaPublicKey[0])
+            print("second position",rsaPublicKey[0].publicKey)
+        }
+        
+      })
+        
     }
     
+    //Send the key to the receiver.
     func keySharingSend(encryptedKey: String,senderId: String, senderUserId: String){
         databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).child(DataBaseReferencePaths.AESKEY).setValue(encryptedKey)
         
     }
     
+    
+    //Receive the encrypted key and decrypt it.
+    /*
     func keySharingReceive(senderId: String, senderuserId: String){
-        databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderuserId).child(DataBaseReferencePaths.AESKEY).observeSingleEvent(of: .value, with: {
+        print("called"); databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderuserId).observeSingleEvent(of: .value, with: {
             (snapshot: DataSnapshot) in
             
+            var aesKey = String()
+            
             if snapshot.exists(){
-                let key = snapshot.value as! String
-                do{
-                    let decryptedKey = try SecurityFramework.security.rsaDecryption(message: key)
-                    SecurityFramework.security.saveIntoKeyChain(data: decryptedKey,key: senderuserId)
+                
+                for child in snapshot.children{
+                    let childrenSnapshot = child as! DataSnapshot
                     
+                    if childrenSnapshot.key == DataBaseReferencePaths.AESKEY{
+                        let key = snapshot.value as! String
+                        do{
+                            let decryptedKey = try SecurityFramework.security.rsaDecryption(message: key)
+                            
+                            aesKey = decryptedKey
+                            
+                            print(aesKey)
+                            
+                        }
+                        catch{
+                            print("Error in decrypting rsa key:",error)
+                        }
+                        break
+                    }
                 }
-                catch{
-                    print("Error in decrypting rsa key:",error)
-                }
+                self.aesKeyDelegate?.getAesKey(aesKey: aesKey)
             }
         })
     }
-    
+ 
+ */
     
 }

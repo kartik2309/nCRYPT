@@ -120,8 +120,8 @@ class AddChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDat
     //MARK: Search Bar Functions
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        let newSearchText = searchText.lowercased()
-        DatabaseProvider.Instance.searchForUsers(searchText: newSearchText)
+        
+        DatabaseProvider.Instance.searchForUsers(searchText: searchText)
        
     }
     

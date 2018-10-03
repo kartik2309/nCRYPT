@@ -8,7 +8,7 @@
 
 import UIKit
 
-class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, FetchMessagesSenderDetails, FetchMessageText, FetchLastMessageText, UISearchBarDelegate{
+class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, FetchMessagesSenderDetails, FetchMessageText, FetchLastMessageText, UISearchBarDelegate {
     
     //MARK: Outlets
     @IBOutlet weak var chatCollectionView: UICollectionView!
@@ -20,7 +20,7 @@ class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSo
     private var senderOfMessages = [MessageSenderHandler]()
     private var filteredData = [MessageSenderHandler]()
     private var newMessage = [UserMessageHandler]()
-    private var newMessages = [String]()
+    private var newMessages = [UserMessageHandler]()
     private var messageHistoryInChat = String()
     private var senderUserName = String()
     private var senderUserId = String()
@@ -119,14 +119,18 @@ class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSo
         if newMessage.isEmpty{
             activityIndicator.stopAnimating()
             activityIndicator.isHidden = true
+            
         }
         else{
             chatCollectionView.reloadData()
             activityIndicator.stopAnimating()
             activityIndicator.isHidden = true
+            print(newMessage[0].messages)
         }
         
     }
+    
+    //MARK: Delegate functions
     
     func lastMessageText(lastMessageText: String) {
         lastMessageTextInString = lastMessageText
@@ -134,6 +138,7 @@ class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSo
     
     //MARK: Update Method for timer(Real Time Update)
     @objc func update(){
+        
         DatabaseProvider.Instance.getMessageSenderDetails()
         DatabaseProvider.Instance.getMessages()
     }
@@ -219,10 +224,36 @@ class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSo
         
         chatCell.userNameLabel.text = filteredData[indexPath.row].name
         
+        print("index path:", indexPath.row)
+        
+        print("size:",newMessage[0].messages.count)
+        
         
         if newMessage[indexPath.row].messages.last != nil {
-            let senderUser_Id = filteredData[indexPath.row].userId
-           // chatCell.chatPreviewLabel.text = SecurityFramework.security.aes256Decryption(messageText: newMessage[indexPath.row].messages.last!, keyData: SecurityFramework.security.keyDerivationForDecryption(senderUserId: senderUser_Id, senderId: senderId), iv: SecurityFramework.security.ivDerivationForDecrpytion(senderUserId: senderUser_Id, senderId: senderId))
+            
+            let lastMessageData = SecurityFramework.security.base64StringToData(input: newMessage[indexPath.row].messages.last!)
+            let currentUserId = UserDefaultHandler.Instance.currentUserId()
+            
+            print("retrieved key:",newMessage[indexPath.row].keys.last as Any)
+            
+            do {
+                let decryptedKey = try SecurityFramework.security.rsaDecryption(message: newMessage[indexPath.row].keys.last!, userId: currentUserId)
+                
+                let decryptedKeyData = SecurityFramework.security.stringToData(input: decryptedKey)
+                
+                
+                print("aes Key",decryptedKey)
+                
+                let decryptedMessage = SecurityFramework.security.dataToString(input: try SecurityFramework.security.aes256Decryption(data: lastMessageData!, keyData: decryptedKeyData!)!)  
+                
+                chatCell.chatPreviewLabel.text = decryptedMessage
+                
+            }
+            catch {
+                print("Error occured in the ChatVC", error)
+            }
+            
+            
             chatCell.chatPreviewLabel.font = UIFont.boldSystemFont(ofSize: 16)
             chatCell.chatPreviewLabel.textColor = UIColor.black
         }
@@ -246,7 +277,10 @@ class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSo
         senderEmail = filteredData[indexPath.row].email
         senderImageUrl = filteredData[indexPath.row].imageUrl
         
-        newMessages = newMessage[indexPath.row].messages
+        newMessages.removeAll()
+        newMessages.append(newMessage[indexPath.row])
+        
+        
         
         performSegue(withIdentifier: OPEN_MESSAGES, sender: self)
         
@@ -280,6 +314,8 @@ class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSo
         
         if segue.identifier == OPEN_MESSAGES{
             
+            searchChat.resignFirstResponder()
+            
             if !name.isEmpty && !email.isEmpty && !uid.isEmpty && !url.isEmpty {
                 let messageViewController = segue.destination as? MessagesVC
                 
@@ -293,7 +329,7 @@ class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSo
                 email.removeAll()
                 url.removeAll()
                 
-                searchChat.resignFirstResponder()
+                
             }
             else{
                 let messageViewController = segue.destination as? MessagesVC
@@ -304,7 +340,7 @@ class ChatVC: UIViewController, UICollectionViewDelegate, UICollectionViewDataSo
                 messageViewController?.senderEmail = senderEmail
                 messageViewController?.senderImageUrl = senderImageUrl
                 
-                searchChat.resignFirstResponder()
+                
             }
         }
     }

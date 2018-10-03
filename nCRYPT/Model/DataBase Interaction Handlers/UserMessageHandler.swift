@@ -11,13 +11,19 @@ import Foundation
 class UserMessageHandler{
     
     private var _messages = [String]()
+    private var _keys = [String]()
     
-    init(messages: [String]) {
+    init(messages: [String], keys: [String]) {
         _messages = messages
+        _keys = keys
     }
     
     var messages: [String]{
         return _messages
+    }
+    
+    var keys: [String]{
+        return _keys
     }
     
     
