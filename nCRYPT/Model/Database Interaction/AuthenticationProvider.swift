@@ -13,6 +13,10 @@ import Firebase
 typealias SignInHandler = (_ msg: String?)-> Void
 typealias SignUpHandler = (_ msg: String?)-> Void
 
+protocol getEmailVerificationMessage: class{
+    func getMessage(error: Error?)
+}
+
 
 //MARK: Structures
 
@@ -23,6 +27,7 @@ private struct SignInHandlerErrorCodes{
     static let WRONG_PASSWORD = "Kindly Provide the correct Password for your account."
     static let USER_NOT_FOUND = "User not found. To use Connect, kindly Sign Up."
     static let PROBLEM_CONNECTING = "An error occurred while performing the request. Please Check your Internet Connection"
+    static let EMAIL_NOT_VERIFIED = "Kindly Verify your email to use WiRED"
 }
 
 private struct signUpHandlerErrorCodes{
@@ -42,6 +47,9 @@ class AuthenticationProvider{
         return _instance
     }
     
+    //MARK: Delegates
+    weak var getMessageCodeDelegate: getEmailVerificationMessage?
+    
     //MARK: Operations
     
     //Sign In Function
@@ -54,9 +62,13 @@ class AuthenticationProvider{
             }
             else{
 
-                signInHandler?(nil)
-                
-                
+                if self.isEmailVerfied(){
+                    signInHandler?(nil)
+                }
+                else{
+                    let error = NSError(domain: "Please Verify your email", code: 0, userInfo: nil)
+                    self.signInErrorHandler(error: error, signInHandler: signInHandler!)
+                }
             }
         })
         
@@ -66,6 +78,7 @@ class AuthenticationProvider{
     func signUp(email: String,fullName: String, password: String, userImage: UIImage, signUpHandler: SignUpHandler?){
         
         Auth.auth().createUser(withEmail: email, password: password, completion: {
+            
             (user, error) in
             
             if error != nil{
@@ -73,8 +86,12 @@ class AuthenticationProvider{
             }
             else{
                 signUpHandler?(nil)
+                
                 if user != nil{
                     let userId = Auth.auth().currentUser?.uid
+                    let pbkd = SecurityFramework.security.pdkf2sha512(password: password)
+                    DatabaseProvider.Instance.saveNewRsaKey(userId: userId!, pbkd: pbkd!)
+                    
                     StorageProvider.Instance.saveTheUser(userId: userId!, email: email, fullName: fullName, userImage: userImage, storageHandler: {
                         
                         (error) in
@@ -84,19 +101,14 @@ class AuthenticationProvider{
                         }
                         else{
                             
-                            self.signIn(email: email, password: password, signInHandler: {
-                                (message) in
-                                
-                                if message != nil{
-                                    print("Error in singning in:", message as Any)
-                                }
-                                
-                            })
+                            print("successfully saved details")
                         }
                     })
                 }
             }
         })
+        
+        
     }
     
     func isSignedIn()-> Bool{
@@ -124,6 +136,26 @@ class AuthenticationProvider{
         return (Auth.auth().currentUser?.uid)!
     }
     
+    func isEmailVerfied()->Bool{
+        let currentUser = Auth.auth().currentUser
+        return currentUser?.isEmailVerified ?? false
+    }
+    
+    func sendEmailVerification(){
+        Auth.auth().currentUser?.sendEmailVerification(completion: {
+            (error) in
+            
+            if error != nil {
+                //Error occured in sending an email
+                self.getMessageCodeDelegate?.getMessage(error: error)
+            }
+            else{
+                //Verfication email has been sent
+                self.getMessageCodeDelegate?.getMessage(error: nil)
+            }
+            
+        })
+    }
     
     //MARK: Private Functions
     
@@ -144,6 +176,9 @@ class AuthenticationProvider{
             case .userNotFound:
                 signInHandler(SignInHandlerErrorCodes.USER_NOT_FOUND)
                 break
+                
+            case .appNotVerified:
+                signInHandler(SignInHandlerErrorCodes.EMAIL_NOT_VERIFIED)
                 
             default:
                 signInHandler(SignInHandlerErrorCodes.PROBLEM_CONNECTING)

@@ -8,21 +8,19 @@
 
 import UIKit
 
-class FinalSignUpVC: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate,UITextFieldDelegate {
-    
+class FinalSignUpVC: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate,UITextFieldDelegate, getEmailVerificationMessage {
     
     //MARK: Outlets
     @IBOutlet weak var userImage: UIImageView!
     @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
-    
-    //MARK: Segues
-    private let CHAT_SEGUE = "ChatSegueFromSignUp"
-    
+    @IBOutlet weak var signUpButton: UIButton!
+    @IBOutlet weak var selectImageButton: UIButton!
     
     //MARK: Varibles
     var fullName = String()
     var email = String()
     var password = String()
+    var errorInEmailVerfication: Error?
     
     //MARK: Image Picker
     var imagePicker = UIImagePickerController()
@@ -32,6 +30,12 @@ class FinalSignUpVC: UIViewController, UIImagePickerControllerDelegate, UINaviga
         // Do any additional setup after loading the view.
         navigationController?.title = fullName
         activityIndicator.isHidden = true
+        signUpButton.layer.cornerRadius = 30
+        
+        userImage.layer.cornerRadius = userImage.frame.size.height/2
+        userImage.clipsToBounds = true
+        
+        selectImageButton.layer.cornerRadius = selectImageButton.frame.size.height/2
     }
     
     override func didReceiveMemoryWarning() {
@@ -78,22 +82,48 @@ class FinalSignUpVC: UIViewController, UIImagePickerControllerDelegate, UINaviga
             
         })
         
-        Timer.scheduledTimer(timeInterval: 11, target: self, selector: #selector(self.chatSegueVc), userInfo: nil, repeats: false)
+        Timer.scheduledTimer(timeInterval: 11, target: self, selector: #selector(self.signInSegue), userInfo: nil, repeats: false)
+        
     }
     
-    @objc func chatSegueVc(){
+    @objc func signInSegue(){
+        AuthenticationProvider.Instance.sendEmailVerification()
+        getErrorMessage()
         activityIndicator.stopAnimating()
-        self.performSegue(withIdentifier: self.CHAT_SEGUE, sender: nil)
     }
+    
+    //MARK: Delegate Functins
+    func getMessage(error: Error?) {
+        self.errorInEmailVerfication = error
+    }
+    
     
     //MARK: Private function
     
     private func alertTheUser(title: String, message: String){
         
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        let ok = UIAlertAction(title: "OK", style: .default, handler: nil)
+        let ok = UIAlertAction(title: "OK", style: .default, handler: {
+            _ in
+            CATransaction.setCompletionBlock({
+                let storyBoard = UIStoryboard(name: "Main", bundle: Bundle.main)
+                let signInVc = storyBoard.instantiateViewController(withIdentifier: "SignInVc") as! SignInVC
+                self.present(signInVc, animated: true, completion: nil)
+            })
+        })
         alert.addAction(ok)
         present(alert,animated: true,completion: nil)
+    }
+    
+    private func getErrorMessage(){
+        
+        if errorInEmailVerfication != nil{
+            alertTheUser(title: "Error", message: "Unknown error occured")
+        }
+        else{
+            alertTheUser(title: "Verify your email", message: "Kindly verifiy your email. A link has been sent to your email.")
+            
+        }
     }
     
 }

@@ -15,6 +15,7 @@ class InfoVc: UIViewController {
     @IBOutlet weak var userImageView: UIImageView!
     @IBOutlet weak var userNameLabel: UILabel!
     @IBOutlet weak var userEmailLabel: UILabel!
+    @IBOutlet weak var submitButton: UIButton!
     
     //MARK: Variables
     
@@ -25,6 +26,11 @@ class InfoVc: UIViewController {
         
         userNameLabel.text = UserDefaultHandler.Instance.currentUserName()
         userEmailLabel.text = UserDefaultHandler.Instance.currentUserEmail()
+        
+        userImageView.layer.cornerRadius = userImageView.frame.size.height/2
+        userImageView.clipsToBounds = true
+        
+        submitButton.layer.cornerRadius = 30
     }
 
     override func didReceiveMemoryWarning() {
@@ -34,11 +40,11 @@ class InfoVc: UIViewController {
     
     @IBAction func signOutAction(_ sender: Any){
         
+        DatabaseProvider.Instance.userIsSigningOut(senderId: AuthenticationProvider.Instance.userId())
+        FileManagerHandler.Instance.userIsSigningOut()
+        
         let storyBoard = UIStoryboard(name: "Main", bundle: Bundle.main)
         let signInVc = storyBoard.instantiateViewController(withIdentifier: "SignInVc") as! SignInVC
-        present(signInVc, animated: true, completion: {
-            //DatabaseProvider.Instance.userIsSigningOut(senderId: AuthenticationProvider.Instance.userId())
-            //FileManagerHandler.Instance.userIsSigningOut()
-        })
+        present(signInVc, animated: true, completion: nil)
     }
 }

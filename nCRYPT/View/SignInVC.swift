@@ -16,6 +16,7 @@ class SignInVC: UIViewController, UITextFieldDelegate {
     @IBOutlet weak var emailTextField: UITextField!
     @IBOutlet weak var passwordTextField: UITextField!
     @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
+    @IBOutlet weak var signInButton: UIButton!
     
     //MARK: Variables
     var timer = Timer()
@@ -37,6 +38,15 @@ class SignInVC: UIViewController, UITextFieldDelegate {
         if !AuthenticationProvider.Instance.signOut(){
             _ = AuthenticationProvider.Instance.signOut()
         }
+        
+        
+        //Setting up basic UI
+        emailTextField.layer.cornerRadius = CGFloat(integerLiteral: 10)
+        passwordTextField.layer.cornerRadius = CGFloat(integerLiteral: 10)
+        signInButton.layer.cornerRadius = CGFloat(integerLiteral: 30)
+        
+        emailTextField.backgroundColor = UIColor.clear
+        passwordTextField.backgroundColor = UIColor.clear
         
     }
     
@@ -63,21 +73,27 @@ class SignInVC: UIViewController, UITextFieldDelegate {
         if emailTextField.text != "" && passwordTextField.text != ""{
             AuthenticationProvider.Instance.signIn(email: emailTextField.text!, password: passwordTextField.text!, signInHandler: {(errorMessage) in
                 
-                if errorMessage != nil{
-                    self.alertTheUser(title: "Problem with Signing In", message: errorMessage!)
+                if AuthenticationProvider.Instance.isEmailVerfied(){
+                    if errorMessage != nil{
+                        self.alertTheUser(title: "Problem with Signing In", message: errorMessage!)
+                    }
+                    else{
+                        self.activityIndicator.isHidden = false
+                        self.activityIndicator.startAnimating()
+                        
+                        DatabaseProvider.Instance.userDataFromDataBase()
+                        UserDefaultHandler.Instance.setCurrentUserId(userId: AuthenticationProvider.Instance.userId())
+                        DatabaseProvider.Instance.retrieveRSAkeys(userId: AuthenticationProvider.Instance.userId(), password: self.passwordTextField.text!)
+                        
+                        self.timer = Timer.scheduledTimer(timeInterval: 5, target: self, selector: #selector(self.callSegueToChatVc), userInfo: nil, repeats: false)
+                        
+                    }
+
                 }
                 else{
-                    
-                    self.activityIndicator.isHidden = false
-                    self.activityIndicator.startAnimating()
-                    
-                    DatabaseProvider.Instance.userDataFromDataBase()
-                    UserDefaultHandler.Instance.setCurrentUserId(userId: AuthenticationProvider.Instance.userId())
-                    
-                    
-                    self.timer = Timer.scheduledTimer(timeInterval: 5, target: self, selector: #selector(self.callSegueToChatVc), userInfo: nil, repeats: false)
-                    
+                    self.alertTheUser(title: "You Cant Sign In", message: "Please Verify your email to use Wired")
                 }
+                
             })
             
         }

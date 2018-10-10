@@ -11,7 +11,7 @@ import Firebase
 import SwiftyRSA
 
 
-private struct DataBaseReferencePaths{
+private struct dbReferencePaths{
     static let USER_DATA = "User Data"
     static let USER_CONTACTS = "User Contacts"
     static let USER_MESSAGES = "User Messages"
@@ -20,6 +20,8 @@ private struct DataBaseReferencePaths{
     static let IMAGE_URL = "Image Url"
     static let MESSAGE = "Messages"
     static let RSA = "RSA"
+    static let RSA_PUBLIC = "public"
+    static let RSA_PRIVATE = "private"
     static let AESKEY = "AES Key"
 }
 
@@ -69,7 +71,7 @@ class DatabaseProvider{
     
     
     func userDataFromDataBase() {
-        print("userNameFromDataBase is being called"); databaseReference.child(AuthenticationProvider.Instance.userId()).child(DataBaseReferencePaths.USER_DATA).observeSingleEvent(of: .value, with: {
+        print("userNameFromDataBase is being called"); databaseReference.child(AuthenticationProvider.Instance.userId()).child(dbReferencePaths.USER_DATA).observeSingleEvent(of: .value, with: {
             (snapshot: DataSnapshot) in
             print(snapshot)
             if snapshot.exists(){
@@ -78,17 +80,17 @@ class DatabaseProvider{
                     
                     let userData = child as! DataSnapshot
                     
-                    if userData.key == DataBaseReferencePaths.FULL_NAME{
+                    if userData.key == dbReferencePaths.FULL_NAME{
                         UserDefaultHandler.Instance.setTheName(userName: userData.value as! String)
                         print("name:",userData)
                     }
                     
-                    else if userData.key == DataBaseReferencePaths.EMAIL{
+                    else if userData.key == dbReferencePaths.EMAIL{
                         UserDefaultHandler.Instance.setTheEmail(email: userData.value as! String)
                         
                     }
                     
-                    else if userData.key == DataBaseReferencePaths.IMAGE_URL{
+                    else if userData.key == dbReferencePaths.IMAGE_URL{
                         let uid = AuthenticationProvider.Instance.userId()
                         UserDefaultHandler.Instance.setImageUrl(imageUrl: userData.value as! String)
                         
@@ -108,19 +110,26 @@ class DatabaseProvider{
     
     func saveUserDataToDataBase(userId: String, email: String, fullName: String, imageUrl: String){
         
-        let data: Dictionary<String, Any> = [DataBaseReferencePaths.EMAIL: email, DataBaseReferencePaths.FULL_NAME: fullName, DataBaseReferencePaths.IMAGE_URL: imageUrl]
+        let data: Dictionary<String, Any> = [dbReferencePaths.EMAIL: email, dbReferencePaths.FULL_NAME: fullName, dbReferencePaths.IMAGE_URL: imageUrl]
         print("Saving to db")
-        databaseReference.child(userId).child(DataBaseReferencePaths.USER_DATA).setValue(data)
+        databaseReference.child(userId).child(dbReferencePaths.USER_DATA).setValue(data)
         
-        saveNewRsaKey(userId: userId)
+        
         
     }
     
-    func saveNewRsaKey(userId: String){
+    func saveNewRsaKey(userId: String, pbkd: Data){
         do{
             if(try SecurityFramework.security.rsaKeyGeneration(userId: userId)){
-                let rsaKeyDictionary: Dictionary<String,String> = [DataBaseReferencePaths.RSA: SecurityFramework.security.rsaPublicKey(userId: userId)]
-                databaseReference.child(userId).child(DataBaseReferencePaths.RSA).setValue(rsaKeyDictionary)
+                let rsaPrivateKey = SecurityFramework.security.rsaPrivateKey(userId: userId)
+                let rsaPrivateKeyData = SecurityFramework.security.stringToData(input: rsaPrivateKey)
+                
+                let rsaEncryptedPrivateKeyData = try SecurityFramework.security.aes256Encryption(data: rsaPrivateKeyData!, keyData: pbkd)
+                
+                let rsaEncryptedPrivateKeyBase64 = SecurityFramework.security.dataToBase64String(input: rsaEncryptedPrivateKeyData)
+                
+                let rsaKeyDictionary: Dictionary<String,String> = [dbReferencePaths.RSA_PUBLIC: SecurityFramework.security.rsaPublicKey(userId: userId), dbReferencePaths.RSA_PRIVATE: rsaEncryptedPrivateKeyBase64!]
+                databaseReference.child(userId).child(dbReferencePaths.RSA).setValue(rsaKeyDictionary)
                 
             }
             
@@ -133,7 +142,7 @@ class DatabaseProvider{
     
     func getMessageSenderDetails(){
         
-        databaseReference.child(UserDefaultHandler.Instance.currentUserId()).child(DataBaseReferencePaths.USER_MESSAGES).observeSingleEvent(of: .value, with: {
+        databaseReference.child(UserDefaultHandler.Instance.currentUserId()).child(dbReferencePaths.USER_MESSAGES).observeSingleEvent(of: .value, with: {
             
             (snapshot: DataSnapshot) in
             
@@ -150,7 +159,7 @@ class DatabaseProvider{
                     
                     if let senderDetails = childSender.value as? NSDictionary{
                         
-                        if let fullName = senderDetails[DataBaseReferencePaths.FULL_NAME] as? String, let email = senderDetails[DataBaseReferencePaths.EMAIL] as? String, let imageUrl = senderDetails[DataBaseReferencePaths.IMAGE_URL] as? String{
+                        if let fullName = senderDetails[dbReferencePaths.FULL_NAME] as? String, let email = senderDetails[dbReferencePaths.EMAIL] as? String, let imageUrl = senderDetails[dbReferencePaths.IMAGE_URL] as? String{
                             
                             let userDetailOfMessage = MessageSenderHandler(userId: key, name: fullName, email: email, imageUrl: imageUrl)
                             
@@ -176,7 +185,7 @@ class DatabaseProvider{
     
     func getMessages(){
         
-        databaseReference.child(UserDefaultHandler.Instance.currentUserId()).child(DataBaseReferencePaths.USER_MESSAGES).queryLimited(toLast: 50).observeSingleEvent(of: DataEventType.value, with: {
+        databaseReference.child(UserDefaultHandler.Instance.currentUserId()).child(dbReferencePaths.USER_MESSAGES).queryLimited(toLast: 50).observeSingleEvent(of: DataEventType.value, with: {
             
             (snapshot: DataSnapshot) in
             
@@ -232,8 +241,8 @@ class DatabaseProvider{
 
     func sendMessageToDatabase(senderUserId: String,senderName: String, senderEmail:String, senderImageUrl: String, senderId: String, message: Dictionary<String, String>){
         
-        let key = self.databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).child(DataBaseReferencePaths.MESSAGE).childByAutoId().key
-        databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).observeSingleEvent(of: DataEventType.value, with: {
+        let key = self.databaseReference.child(senderUserId).child(dbReferencePaths.USER_MESSAGES).child(senderId).child(dbReferencePaths.MESSAGE).childByAutoId().key
+        databaseReference.child(senderUserId).child(dbReferencePaths.USER_MESSAGES).child(senderId).observeSingleEvent(of: DataEventType.value, with: {
             
             (snapshot: DataSnapshot) in
             
@@ -242,18 +251,18 @@ class DatabaseProvider{
                 
                 let messageDict: Dictionary<String, Any> = [key!: message]
                 
-                self.databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).child(DataBaseReferencePaths.MESSAGE).updateChildValues(messageDict)
+                self.databaseReference.child(senderUserId).child(dbReferencePaths.USER_MESSAGES).child(senderId).child(dbReferencePaths.MESSAGE).updateChildValues(messageDict)
  
             }
             else{
 
-                let data: Dictionary<String, Any> = [DataBaseReferencePaths.EMAIL: senderEmail, DataBaseReferencePaths.FULL_NAME: senderName, DataBaseReferencePaths.IMAGE_URL: senderImageUrl]
+                let data: Dictionary<String, Any> = [dbReferencePaths.EMAIL: senderEmail, dbReferencePaths.FULL_NAME: senderName, dbReferencePaths.IMAGE_URL: senderImageUrl]
                 
-                self.databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).setValue(data)
+                self.databaseReference.child(senderUserId).child(dbReferencePaths.USER_MESSAGES).child(senderId).setValue(data)
                 
                 let messageDict: Dictionary<String, Any> = [key! : message]
                 
-                self.databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).child(DataBaseReferencePaths.MESSAGE).updateChildValues(messageDict)
+                self.databaseReference.child(senderUserId).child(dbReferencePaths.USER_MESSAGES).child(senderId).child(dbReferencePaths.MESSAGE).updateChildValues(messageDict)
                 
             }
 
@@ -263,13 +272,13 @@ class DatabaseProvider{
     }
     
     func removeMessages(senderId: String, senderUserId: String){
-        databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderUserId).child(DataBaseReferencePaths.MESSAGE).removeValue()
+        databaseReference.child(senderId).child(dbReferencePaths.USER_MESSAGES).child(senderUserId).child(dbReferencePaths.MESSAGE).removeValue()
     }
     
     func deliverMessagesDirectlyToMessageView(senderId: String, senderUserId: String, flag: Bool){
         
         if flag {
-            databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderUserId).child(DataBaseReferencePaths.MESSAGE).observeSingleEvent(of: .value) {
+            databaseReference.child(senderId).child(dbReferencePaths.USER_MESSAGES).child(senderUserId).child(dbReferencePaths.MESSAGE).observeSingleEvent(of: .value) {
                 (snapshot: DataSnapshot) in
                 
                 
@@ -325,12 +334,12 @@ class DatabaseProvider{
                     let userData = child1 as! DataSnapshot
                     let key = userData.key
                     
-                    if key == DataBaseReferencePaths.USER_DATA{
+                    if key == dbReferencePaths.USER_DATA{
                         let userDetailsDictionary = userData.value as? NSDictionary
                             
-                        let email = userDetailsDictionary![DataBaseReferencePaths.EMAIL] as! String
-                        let ImageUrl = userDetailsDictionary![DataBaseReferencePaths.IMAGE_URL] as! String
-                        let name = userDetailsDictionary![DataBaseReferencePaths.FULL_NAME] as! String
+                        let email = userDetailsDictionary![dbReferencePaths.EMAIL] as! String
+                        let ImageUrl = userDetailsDictionary![dbReferencePaths.IMAGE_URL] as! String
+                        let name = userDetailsDictionary![dbReferencePaths.FULL_NAME] as! String
                         
                         if name.range(of: searchText) != nil && name != currentUserName {
                             
@@ -350,27 +359,28 @@ class DatabaseProvider{
     
     func saveNewChat(senderUserId: String, senderUserName: String, senderUserEmail: String, senderUserImageUrl: String,senderId: String){
        
-        databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderUserId).observeSingleEvent(of: .value) {
+        databaseReference.child(senderId).child(dbReferencePaths.USER_MESSAGES).child(senderUserId).observeSingleEvent(of: .value) {
             (snapshot: DataSnapshot) in
             
             if !snapshot.exists(){
-                let data: Dictionary<String, Any> = [DataBaseReferencePaths.EMAIL: senderUserEmail, DataBaseReferencePaths.FULL_NAME: senderUserName, DataBaseReferencePaths.IMAGE_URL: senderUserImageUrl]
-                self.databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderUserId).setValue(data)
+                let data: Dictionary<String, Any> = [dbReferencePaths.EMAIL: senderUserEmail, dbReferencePaths.FULL_NAME: senderUserName, dbReferencePaths.IMAGE_URL: senderUserImageUrl]
+                self.databaseReference.child(senderId).child(dbReferencePaths.USER_MESSAGES).child(senderUserId).setValue(data)
             }
         }
+        
     }
     
     func userIsSigningOut(senderId: String){
-       databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).removeValue()
+       databaseReference.child(senderId).child(dbReferencePaths.USER_MESSAGES).removeValue()
     }
  
     func userSwippedToDeleteMessages(senderId: String, senderUserId: String){
-        databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderUserId).removeValue()
+        databaseReference.child(senderId).child(dbReferencePaths.USER_MESSAGES).child(senderUserId).removeValue()
         
     }
     
     func getPublickey(senderUserId: String){
-      databaseReference.child(senderUserId).child(DataBaseReferencePaths.RSA).observe(.value, with: {
+      databaseReference.child(senderUserId).child(dbReferencePaths.RSA).observe(.value, with: {
             (snapshot: DataSnapshot) in
         
         if(snapshot.exists()){
@@ -392,47 +402,44 @@ class DatabaseProvider{
         
     }
     
-    //Send the key to the receiver.
-    func keySharingSend(encryptedKey: String,senderId: String, senderUserId: String){
-        databaseReference.child(senderUserId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderId).child(DataBaseReferencePaths.AESKEY).setValue(encryptedKey)
-        
-    }
     
-    
-    //Receive the encrypted key and decrypt it.
-    /*
-    func keySharingReceive(senderId: String, senderuserId: String){
-        print("called"); databaseReference.child(senderId).child(DataBaseReferencePaths.USER_MESSAGES).child(senderuserId).observeSingleEvent(of: .value, with: {
+    func retrieveRSAkeys(userId: String, password: String){
+        databaseReference.child(userId).child(dbReferencePaths.RSA).observeSingleEvent(of: .value, with: {
             (snapshot: DataSnapshot) in
             
-            var aesKey = String()
-            
-            if snapshot.exists(){
+            if(snapshot.exists()){
                 
                 for child in snapshot.children{
-                    let childrenSnapshot = child as! DataSnapshot
                     
-                    if childrenSnapshot.key == DataBaseReferencePaths.AESKEY{
-                        let key = snapshot.value as! String
-                        do{
-                            let decryptedKey = try SecurityFramework.security.rsaDecryption(message: key)
-                            
-                            aesKey = decryptedKey
-                            
-                            print(aesKey)
-                            
-                        }
-                        catch{
-                            print("Error in decrypting rsa key:",error)
-                        }
-                        break
+                    let rsaKeys = child as! DataSnapshot
+                    
+                    if(rsaKeys.key == "public"){
+                        let publicKey = rsaKeys.value as! String
+                        SecurityFramework.security.saveIntoKeyChain(data: publicKey, key: "public" + userId)
                     }
+                    else if(rsaKeys.key == "private"){
+                        
+                        let encryptedPrivateKeyBase64 = rsaKeys.value as! String
+                        
+                        let encryptedString = SecurityFramework.security.base64StringToData(input: encryptedPrivateKeyBase64)
+                        
+                         let pbkdfv = SecurityFramework.security.pdkf2sha512(password: password)
+                        
+                        do{
+                           
+                            let rsaPrivateKeyData = try SecurityFramework.security.aes256Decryption(data: encryptedString!, keyData: pbkdfv!)
+                            let rsaPrivateKeyString = SecurityFramework.security.dataToString(input: rsaPrivateKeyData!)
+                            SecurityFramework.security.saveIntoKeyChain(data: rsaPrivateKeyString!, key: "private" + userId)
+                            
+                        }
+                        catch {
+                            print("Could retrieve rsa keys",error)
+                        }
+                    }
+                    
                 }
-                self.aesKeyDelegate?.getAesKey(aesKey: aesKey)
             }
         })
     }
- 
- */
     
 }

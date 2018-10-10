@@ -30,6 +30,10 @@ class UserInfoVC: UIViewController{
         userNameLabel.text = userName
         userEmailLabel.text = userEmail
         
+        userImageView.layer.cornerRadius = userImageView.frame.size.height/2
+        userImageView.clipsToBounds = true
+        
+        
     }
     
     override func didReceiveMemoryWarning() {

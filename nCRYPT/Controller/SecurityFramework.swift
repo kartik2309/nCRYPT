@@ -26,7 +26,7 @@ class SecurityFramework{
         
     }
 
-    
+    //MARK: Encoding Functions
     func stringToData(input: String) -> Data?{
         
         guard let data = input.data(using: .utf8, allowLossyConversion: false)
@@ -70,6 +70,42 @@ class SecurityFramework{
             }
         }
         return digestData
+    }
+    
+    
+    //MARK: Password based key dervivation function
+    func pdkf2sha512(password: String) -> Data? {
+        
+        let salt = password.data(using: .utf8, allowLossyConversion: true)
+        
+        let keyData = pbkdf2(hash: CCPBKDFAlgorithm(kCCPRFHmacAlgSHA512), password: password, salt: salt!, keyByteCount: 32, rounds: 9973)
+        
+        return keyData
+    }
+    
+    private func pbkdf2(hash :CCPBKDFAlgorithm, password: String, salt: Data, keyByteCount: Int, rounds: Int) -> Data? {
+        let passwordData = password.data(using:String.Encoding.utf8)!
+        var derivedKeyData = Data(repeating:0, count:keyByteCount)
+        var derivedKeyDataCopy = derivedKeyData
+        
+        let derivationStatus = derivedKeyDataCopy.withUnsafeMutableBytes {derivedKeyBytes in
+            salt.withUnsafeBytes { saltBytes in
+                
+                CCKeyDerivationPBKDF(
+                    CCPBKDFAlgorithm(kCCPBKDF2),
+                    password, passwordData.count,
+                    saltBytes, salt.count,
+                    hash,
+                    UInt32(rounds),
+                    derivedKeyBytes, derivedKeyData.count)
+            }
+        }
+        if (derivationStatus != 0) {
+            print("Error: \(derivationStatus)")
+            return nil;
+        }
+        
+        return derivedKeyData
     }
     
     //MARK: RSA
@@ -229,40 +265,4 @@ class SecurityFramework{
         return KeychainWrapper.standard.string(forKey: key)!
     }
     
-    //MARK: Key Sharing
-/*
-    func KeySharingReceive(aesKey: String) throws -> String{
-        let decryptedKey = try rsaDecryption(message: aesKey, userId: <#String#>)
-        return decryptedKey
-    }
- 
- 
-    
-    func saveAesSessionKey(key : String, senderUserId: String) {
-        saveIntoKeyChain(data: key, key: senderUserId + "aesKey")
-    }
-    
-    func isKeySaved(senderUserId: String) -> Bool{
-        var aesKeyPresent = false
-        
-        if (KeychainWrapper.standard.string(forKey: senderUserId + "aesKey") != nil)
-        {
-            aesKeyPresent = true
-        }
-        
-        return aesKeyPresent
-    }
-    
-    func getAesKey(senderUserId: String) -> String {
-        return readFromKeyChain(key: senderUserId + "aesKey")
-    }
-    
-    func removeSessionKey(senderUserId: String) {
-        if isKeySaved(senderUserId: senderUserId){
-            KeychainWrapper.standard.removeObject(forKey: senderUserId + "aesKey")
-        }
-        
-    }
-     */
-
 }

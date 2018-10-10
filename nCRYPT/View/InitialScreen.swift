@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import LocalAuthentication
 
 class InitialScreen: UIViewController {
     
@@ -25,22 +26,50 @@ class InitialScreen: UIViewController {
     }
     
     override func viewDidAppear(_ animated: Bool) {
+        
         if AuthenticationProvider.Instance.isSignedIn(){
-            performSegue(withIdentifier: CHAT_SEGUE_FROM_FIRST_SCREEN, sender: nil)
+            
+            let context = LAContext()
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) {
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Kindly Authenticate with TouchID", reply: {
+                    (wasCorrect, error) in
+                    
+                    if wasCorrect {
+                        self.performSegue(withIdentifier: self.CHAT_SEGUE_FROM_FIRST_SCREEN, sender: nil)
+                    }
+                    else{
+                        self.alertTheUser(title: "Error", message: "We require your TouchID to authorize your login")
+                    }
+                })
+            }
+            else{
+                context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Enter You Passcode!", reply: {
+                    (wasCorrect, error) in
+                    
+                    if wasCorrect {
+                        self.performSegue(withIdentifier: self.CHAT_SEGUE_FROM_FIRST_SCREEN, sender: nil)
+                    }
+                    else{
+                        self.alertTheUser(title: "Error", message: "We require your passcode to authorize your login")
+                    }
+                })
+            }
+            
         }
         else{
             performSegue(withIdentifier: SIGN_IN_SEGUE, sender: nil)
         }
     }
-
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
+    
+    
+    //MARK: Private Functions
+    private func alertTheUser(title: String, message: String){
+        
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        let ok = UIAlertAction(title: "OK", style: .default, handler: nil)
+        alert.addAction(ok)
+        present(alert,animated: true,completion: nil)
     }
-    */
 
 }
